@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv*/
+env/
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Vector database (auto-generated)
+chroma_db/
+chroma_db.bak.*/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Runtime artifacts and logs
+*.log
+server.log
+
+# User Data Directories
+docs/*
+!docs/.gitkeep
+memory/*
+!memory/.gitkeep
+sessions/*
+!sessions/.gitkeep
+skills/*
+!skills/.gitkeep
+pdfs/*
+!pdfs/.gitkeep

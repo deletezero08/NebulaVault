@@ -1,0 +1,17 @@
+chroma_db/
+memory/
+sessions/
+docs/
+pdfs/
+skills/
+venv/
+.venv/
+.venv*/
+__pycache__/
+*.sqlite3
+.git/
+.DS_Store
+*.pyc
+*.pyo
+.pytest_cache/
+.gemini/

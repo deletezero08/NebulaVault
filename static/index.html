@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星澜知库 NebulaVault</title>
+    <!-- 引入现代化字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Highlight.js 的浅色主题 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=16-i18n">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 背景动效层 -->
+        <div class="background-orb orb-1"></div>
+        <div class="background-orb orb-2"></div>
+        <div class="background-orb orb-3"></div>
+
+        <!-- 玻璃面板主体 -->
+        <main class="glass-panel">
+            
+            <!-- 左侧边栏：状态面板与文件管理 -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="logo-icon"><i class="fa-solid fa-brain"></i></div>
+                    <h1 data-i18n="nav_title">星澜知库</h1>
+                    <div class="lang-switcher">
+                        <button id="btn-lang-toggle" title="Switch Language">EN</button>
+                    </div>
+                </div>
+
+                <div class="status-cards">
+                    <div class="status-card">
+                        <div class="status-icon"><i class="fa-solid fa-microchip"></i></div>
+                        <div class="status-info">
+                            <span class="label" data-i18n="llm_model_label">LLM 模型</span>
+                            <span class="value" id="val-llm-model">--</span>
+                        </div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-icon"><i class="fa-solid fa-network-wired"></i></div>
+                        <div class="status-info">
+                            <span class="label" data-i18n="embed_model_label">向量模型</span>
+                            <span class="value" id="val-embed-model">--</span>
+                        </div>
+                    </div>
+                    <div class="status-card">
+                        <div class="status-icon"><i class="fa-solid fa-database"></i></div>
+                        <div class="status-info">
+                            <span class="label" data-i18n="index_status_label">索引状态</span>
+                            <span class="value" id="val-index-status">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 会话管理区 (Session Management) -->
+                <div class="session-section" style="margin-bottom: 20px;">
+                    <button id="btn-new-chat" class="btn-action-outline glass-btn" style="width: 100%; justify-content: center; margin-bottom: 10px; background: rgba(255, 255, 255, 0.05);">
+                        <i class="fa-solid fa-plus"></i> <span data-i18n="new_chat">开启新对话</span>
+                    </button>
+                    <div class="session-list" id="session-list">
+                        <!-- 动态会话列表 (Populated by JS) -->
+                    </div>
+                </div>
+
+                <!-- 文件列表 -->
+                <div class="file-section">
+                    <div class="section-title">
+                        <h2 data-i18n="knowledge_base"><i class="fa-regular fa-folder-open"></i> 知识库目录</h2>
+                    </div>
+                    <div class="file-tree-container">
+                        <div id="file-tree" class="file-tree">
+                            <div class="tree-loading">
+                                <i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="loading_directory">加载目录结构中...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-rebuild-index" class="glass-btn" style="margin-top: 1rem; width: 100%;">
+                        <i class="fa-solid fa-bolt"></i>
+                        <span data-i18n="rebuild_index">重新构建索引</span>
+                        <div class="btn-glow"></div>
+                    </button>
+                    <!-- 进度条挂载点 -->
+                    <div id="index-progress-container" class="progress-wrap" style="display: none; margin-top: 10px;">
+                        <div class="progress-text" data-i18n="progress_starting">即将开始...</div>
+                        <div class="progress-track">
+                            <div id="index-progress-bar" class="progress-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 侧边栏调整宽度手柄 (Sidebar Resize Handle) -->
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+
+            <!-- 右侧聊天区 -->
+            <section class="chat-area">
+                <header class="chat-header">
+                    <div class="chat-header-left">
+                        <i class="fa-solid fa-comments"></i>
+                        <span id="current-chat-title" data-i18n="nav_title">星澜知库</span>
+                        <div class="online-indicator" style="margin-left: 15px;">
+                            <div class="dot"></div>
+                            <span data-i18n="system_online" style="font-size: 0.8em; opacity: 0.7;">已连接</span>
+                        </div>
+                    </div>
+                    <div class="chat-header-actions">
+                        <button id="btn-save-insights" class="btn-action-outline" data-i18n-title="save_insights">
+                            <i class="fa-solid fa-brain"></i> <span data-i18n="save_insights_btn">存为记忆</span>
+                        </button>
+                        <button id="btn-clear-chat" class="icon-btn" title="清空会话" style="margin-left: 10px;">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="chat-history" id="chat-history">
+                    <!-- 初始占位/欢迎语 -->
+                    <div class="welcome-container" id="welcome-state">
+                        <div class="welcome-icon"><i class="fa-solid fa-layer-group"></i></div>
+                        <h2 data-i18n="welcome_title">今天想了解关于文档的什么？</h2>
+                        <p data-i18n="welcome_subtitle">请在左侧"重新构建索引"后，点击下方建议或直接输入提问。</p>
+                        
+                        <div class="suggestion-chips" id="dynamic-suggestions" style="margin-top: 20px;">
+                            <!-- 动态文件建议由 JS 渲染 -->
+                            <div class="tree-loading" style="font-size: 0.9rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="loading_suggestions">加载热门文档...</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 底部输入框 -->
+                <div class="input-container">
+                    <div class="input-wrapper glass-input">
+                        <textarea id="chat-input" placeholder="向知识库提问 (Shift + Enter 换行)..." rows="1"></textarea>
+                        <button id="btn-send" class="send-btn" disabled>
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 实时日志控制台 -->
+                <div class="log-console-toggle" id="btn-toggle-logs" title="查看运行日志">
+                    <i class="fa-solid fa-terminal"></i>
+                </button>
+            </section>
+        </main>
+    </div>
+
+    <!-- 日志抽屉 -->
+    <div class="log-drawer" id="log-drawer">
+        <!-- 调整大小手柄 (Resize Handle) -->
+        <div id="log-resize-handle" class="log-resize-handle"></div>
+        <div class="log-drawer-header">
+            <div class="title"><i class="fa-solid fa-terminal"></i> 系统实时日志 (System Events)</div>
+            <div class="actions">
+                <button id="btn-clear-logs" title="清理日志"><i class="fa-solid fa-eraser"></i></button>
+                <button id="btn-close-logs" title="关闭"><i class="fa-solid fa-times"></i></button>
+            </div>
+        </div>
+        <div class="log-content" id="log-container">
+            <!-- 日志行 -->
+        </div>
+    </div>
+
+    <!-- 弹窗遮罩 -->
+    <div class="toast-overlay" id="toast-overlay">
+        <div class="toast-modal glass-modal">
+            <div class="spinner"></div>
+            <h3 id="toast-title">正在处理中...</h3>
+            <p id="toast-desc">这可能需要一点时间</p>
+            <div class="progress-bar-container" style="display: none; width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; margin-top: 15px; overflow: hidden;">
+                <div id="toast-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); transition: width 0.3s ease;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通用弹窗 (Universal Confirm/Prompt Modal) -->
+    <div class="toast-overlay confirm-overlay" id="confirm-overlay">
+        <div class="toast-modal confirm-modal glass-modal">
+            <div class="confirm-icon" id="confirm-icon"><i class="fa-solid fa-circle-question" style="color: var(--primary); font-size: 2.5rem; margin-bottom: 1rem;"></i></div>
+            <h3 id="confirm-title">确认操作</h3>
+            <p id="confirm-desc">您确定要执行此操作吗？</p>
+            <div class="confirm-actions" id="confirm-buttons">
+                <button id="btn-confirm-cancel" class="btn-action-outline">取消</button>
+                <button id="btn-confirm-ok" class="btn-action-outline danger">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拖拽上传遮罩 (Drag-and-Drop Overlay) -->
+    <div id="drop-overlay" class="drop-overlay">
+        <div class="drop-content">
+            <div class="drop-icon-box">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+            </div>
+            <h2 data-i18n="drop_title">释放开始上传</h2>
+            <p data-i18n="drop_subtitle">支持文件及文件夹批量拖入</p>
+        </div>
+    </div>
+
+
+    <!-- 文件预览弹窗 (File Preview Modal) -->
+    <div class="toast-overlay" id="preview-overlay">
+        <div class="preview-modal glass-modal">
+            <div class="preview-header">
+                <div class="preview-title">
+                    <i class="fa-regular fa-file-lines"></i>
+                    <span id="preview-filename">filename.md</span>
+                </div>
+                <div class="preview-actions">
+                    <button id="btn-close-preview" title="Close"><i class="fa-solid fa-times"></i></button>
+                </div>
+            </div>
+            <div class="preview-content-wrap">
+                <div id="preview-body" class="markdown-body">
+                    <!-- 内容动态注入 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="/static/js/app.js?v=29-xss-fix"></script>
+</body>
+</html>
