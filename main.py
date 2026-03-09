@@ -15,7 +15,7 @@ from pathlib import Path
 import threading
 
 from fastapi import FastAPI, UploadFile, File, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
@@ -348,8 +348,9 @@ def get_files_tree() -> Dict[str, Any]:
                     "children": build_tree(full_path, rel_path)
                 })
             else:
-                # 简单过滤常见文档后缀
-                if entry.lower().endswith(('.md', '.pdf', '.docx', '.csv', '.txt', '.py', '.json', '.yaml', '.yml', '.html')):
+                # 使用 src.config 中定义的 SUPPORTED_EXTENSIONS 进行过滤
+                from src.config import SUPPORTED_EXTENSIONS
+                if entry.lower().endswith(tuple(SUPPORTED_EXTENSIONS)):
                     tree.append({
                         "name": entry,
                         "type": "file",
@@ -442,15 +443,58 @@ async def get_file_content(path: str) -> Dict[str, Any]:
 
         # 读取内容
         suffix = target_file.suffix.lower()
-        if suffix in ['.pdf', '.docx']:
-            return {"ok": False, "error": "暂不支持预览二进制文件，请直接在对话中分析。"}
+        if suffix in ['.docx']:
+            return {"ok": False, "error": "暂不支持预览该格式文件，请直接在对话中分析。"}
         
+        # 如果是 PDF，返回标记让前端用 iframe 加载
+        if suffix == '.pdf':
+            return {"ok": True, "is_pdf": True, "filename": target_file.name, "raw_url": f"/api/files/raw?path={quote(path)}"}
+
+        # 如果是图片，返回 base64
+        if suffix in ['.png', '.jpg', '.jpeg', '.webp']:
+            import base64
+            with open(target_file, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode("utf-8")
+                mime_type = f"image/{suffix[1:]}"
+                if suffix == '.jpg': mime_type = "image/jpeg"
+                return {"ok": True, "content": f"data:{mime_type};base64,{encoded_string}", "filename": target_file.name, "is_image": True}
+
         content = target_file.read_text("utf-8", errors="replace")
         return {"ok": True, "content": content, "filename": target_file.name}
     except OSError as e:
         logger.exception("api_get_file_content_error")
         return {"ok": False, "error": str(e)}
 
+
+@app.get("/api/files/raw")
+async def get_raw_file(path: str) -> Union[FileResponse, JSONResponse]:
+    """直接返回原始文件流 (Binary Stream)，支持 PDF, Image 预览"""
+    from src.config import DOCS_DIR, SKILLS_DIR
+    import mimetypes
+    try:
+        clean_path = os.path.normpath(path).lstrip(os.sep + "./")
+        
+        target_file_docs = (DOCS_DIR / clean_path).resolve()
+        target_file_skills = (SKILLS_DIR / clean_path).resolve()
+        
+        resolved_docs_dir = DOCS_DIR.resolve()
+        resolved_skills_dir = SKILLS_DIR.resolve()
+        
+        if target_file_docs.is_file() and target_file_docs.is_relative_to(resolved_docs_dir):
+            target_file = target_file_docs
+        elif target_file_skills.is_file() and target_file_skills.is_relative_to(resolved_skills_dir):
+            target_file = target_file_skills
+        else:
+            return JSONResponse(status_code=403, content={"error": "Access denied or file not found"})
+
+        if not target_file.exists():
+            return JSONResponse(status_code=404, content={"error": "File not found"})
+
+        mime_type, _ = mimetypes.guess_type(target_file)
+        return FileResponse(path=target_file, media_type=mime_type or "application/octet-stream", filename=target_file.name)
+    except Exception as e:
+        logger.exception("api_get_raw_file_error")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 class SessionCreate(BaseModel):

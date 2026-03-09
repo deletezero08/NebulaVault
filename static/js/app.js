@@ -228,16 +228,20 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.spinner.style.display = showSpinner ? 'block' : 'none';
         elements.toastProgressContainer.style.display = 'none';
         
-        // 清理旧图标
         const existingIcon = elements.toastOverlay.querySelector('.toast-custom-icon');
         if (existingIcon) existingIcon.remove();
         
-        // 如果提供了自定义图标 (如大大的勾)
         if (iconHtml) {
             elements.toastTitle.insertAdjacentHTML('beforebegin', `<div class="toast-custom-icon">${iconHtml}</div>`);
         }
         
         elements.toastOverlay.classList.add('active');
+    }
+
+    function hideToast() {
+        if (elements.toastOverlay) {
+            elements.toastOverlay.classList.remove('active');
+        }
     }
 
     // Initial language setup - fire and forget
@@ -616,6 +620,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let isProcessing = false;
+    const AUTO_SCROLL_THRESHOLD = 180;
+    let autoScrollLockedByUser = false;
+    let isProgrammaticScroll = false;
+
+    function isNearBottom(threshold = AUTO_SCROLL_THRESHOLD) {
+        const container = elements.chatHistory;
+        if (!container) return true;
+        const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+        return distance <= threshold;
+    }
+
+    if (elements.chatHistory) {
+        // 用户在流式输出时上滑查看历史，暂停自动跟随，避免和滚轮冲突。
+        elements.chatHistory.addEventListener('wheel', (e) => {
+            if (!isProcessing) return;
+            if (e.deltaY < 0) {
+                autoScrollLockedByUser = true;
+            } else if (isNearBottom()) {
+                autoScrollLockedByUser = false;
+            }
+        }, { passive: true });
+
+        // 用户手动滚回底部后，自动恢复跟随输出。
+        elements.chatHistory.addEventListener('scroll', () => {
+            if (isProgrammaticScroll) return;
+            if (!isProcessing) {
+                autoScrollLockedByUser = false;
+                return;
+            }
+            autoScrollLockedByUser = !isNearBottom();
+        });
+    }
 
     function processSseBuffer(buffer, onEvent) {
         let normalized = buffer.replace(/\r\n/g, '\n');
@@ -830,7 +866,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 let contentHtml = '';
                 const suffix = (data.filename || path).toLowerCase();
                 
-                if (suffix.endsWith('.md')) {
+                if (data.is_image) {
+                    contentHtml = `<div class="preview-image-container">
+                        <img src="${data.content}" alt="${data.filename}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                    </div>`;
+                } else if (data.is_pdf) {
+                    // Embed PDF using iframe pointing to the raw file endpoint
+                    contentHtml = `<div class="preview-pdf-container" style="height: 70vh; width: 100%;">
+                        <iframe src="${data.raw_url}" style="width: 100%; height: 100%; border: none; border-radius: 4px;"></iframe>
+                    </div>`;
+                } else if (suffix.endsWith('.md')) {
                     const rawHtml = marked.parse(data.content);
                     contentHtml = typeof DOMPurify !== "undefined" ? DOMPurify.sanitize(rawHtml) : rawHtml;
                 } else {
@@ -1259,6 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         isProcessing = true;
+        autoScrollLockedByUser = false;
         elements.chatInput.value = '';
         elements.chatInput.style.height = 'auto';
         elements.btnSend.disabled = true;
@@ -1496,6 +1542,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } finally {
             isProcessing = false;
+            autoScrollLockedByUser = false;
             if (elements.chatInput.value.trim().length > 0) {
                 elements.btnSend.disabled = false;
             }
@@ -1633,14 +1680,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function scrollToBottom(force = false) {
         const container = elements.chatHistory;
         if (!container) return;
-        
-        // 智能检测：如果用户已经在底部附近（200px内），或者强制置底
-        const isNearBottom = (container.scrollHeight - container.scrollTop - container.clientHeight) < 200;
 
-        if (force || isNearBottom) {
+        if (!force && autoScrollLockedByUser) return;
+
+        if (force || isNearBottom()) {
             // 使用 setTimeout 确保在布局更新后执行
             setTimeout(() => {
+                isProgrammaticScroll = true;
                 container.scrollTop = container.scrollHeight;
+                requestAnimationFrame(() => {
+                    isProgrammaticScroll = false;
+                });
             }, 50);
         }
     }
