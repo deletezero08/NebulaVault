@@ -22,6 +22,7 @@ from sse_starlette.sse import EventSourceResponse
 import httpx
 import uvicorn
 from logging.handlers import RotatingFileHandler
+from urllib.parse import quote
 
 from src.engine import LocalRAG
 from src.config import get_runtime_status, list_doc_files, list_skill_files, DOCS_DIR, SKILLS_DIR
@@ -64,8 +65,8 @@ async def security_middleware(request: Request, call_next: Any) -> Any:
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
-        elif request.url.path in ["/api/query/stream", "/api/index"] or "stream" in request.url.path:
-            # Fallback to query param for EventSource (SSE) which cannot send custom headers
+        elif request.url.path in ["/api/query/stream", "/api/index", "/api/files/raw"] or "stream" in request.url.path:
+            # Fallback to query param for EventSource (SSE) and iframes which cannot send custom headers
             token = request.query_params.get("token")
         if not token:
             token = request.cookies.get("rag_token")
@@ -448,7 +449,7 @@ async def get_file_content(path: str) -> Dict[str, Any]:
         
         # 如果是 PDF，返回标记让前端用 iframe 加载
         if suffix == '.pdf':
-            return {"ok": True, "is_pdf": True, "filename": target_file.name, "raw_url": f"/api/files/raw?path={quote(path)}"}
+            return {"ok": True, "is_pdf": True, "filename": target_file.name, "raw_url": f"/api/files/raw?path={quote(path)}&token={API_KEY}"}
 
         # 如果是图片，返回 base64
         if suffix in ['.png', '.jpg', '.jpeg', '.webp']:
@@ -466,7 +467,7 @@ async def get_file_content(path: str) -> Dict[str, Any]:
         return {"ok": False, "error": str(e)}
 
 
-@app.get("/api/files/raw")
+@app.get("/api/files/raw", response_model=None)
 async def get_raw_file(path: str) -> Union[FileResponse, JSONResponse]:
     """直接返回原始文件流 (Binary Stream)，支持 PDF, Image 预览"""
     from src.config import DOCS_DIR, SKILLS_DIR
@@ -491,7 +492,18 @@ async def get_raw_file(path: str) -> Union[FileResponse, JSONResponse]:
             return JSONResponse(status_code=404, content={"error": "File not found"})
 
         mime_type, _ = mimetypes.guess_type(target_file)
-        return FileResponse(path=target_file, media_type=mime_type or "application/octet-stream", filename=target_file.name)
+        media = mime_type or "application/octet-stream"
+
+        # Use inline disposition so PDFs/images render in iframes instead of downloading
+        from starlette.responses import Response
+        content_bytes = target_file.read_bytes()
+        return Response(
+            content=content_bytes,
+            media_type=media,
+            headers={
+                "Content-Disposition": f'inline; filename="{target_file.name}"',
+            },
+        )
     except Exception as e:
         logger.exception("api_get_raw_file_error")
         return JSONResponse(status_code=500, content={"error": str(e)})

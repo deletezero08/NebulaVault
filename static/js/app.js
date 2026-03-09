@@ -848,15 +848,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         try {
-            showToast(
-                TRANSLATIONS[currentLang].nav_title, 
-                `正在加载 ${path}...`, 
-                true
-            );
+            // Delay toast slightly; if request is fast (<200ms), don't show it to avoid flickering
+            const toastTimer = setTimeout(() => {
+                showToast(
+                    TRANSLATIONS[currentLang].nav_title, 
+                    `正在加载 ${path}...`, 
+                    true
+                );
+            }, 200);
 
+            console.log("Fetching content for path:", path);
             const res = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`, { headers: getHeaders() });
             const data = await res.json();
+            console.log("Preview API response:", data);
             
+            clearTimeout(toastTimer);
             hideToast();
 
             if (data.ok) {
@@ -871,10 +877,33 @@ document.addEventListener('DOMContentLoaded', () => {
                         <img src="${data.content}" alt="${data.filename}" style="max-width: 100%; height: auto; display: block; margin: 0 auto; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
                     </div>`;
                 } else if (data.is_pdf) {
-                    // Embed PDF using iframe pointing to the raw file endpoint
-                    contentHtml = `<div class="preview-pdf-container" style="height: 70vh; width: 100%;">
-                        <iframe src="${data.raw_url}" style="width: 100%; height: 100%; border: none; border-radius: 4px;"></iframe>
-                    </div>`;
+                    // Fetch PDF as blob with auth headers, then create blob URL for iframe
+                    const pdfUrl = data.raw_url;
+                    console.log("Fetching PDF blob from:", pdfUrl);
+                    try {
+                        const pdfRes = await fetch(pdfUrl, { headers: getHeaders() });
+                        if (pdfRes.ok) {
+                            const pdfBlob = await pdfRes.blob();
+                            const blobUrl = URL.createObjectURL(pdfBlob);
+                            contentHtml = `<div class="preview-pdf-container" style="height: 70vh; width: 100%;">
+                                <iframe src="${blobUrl}" style="width: 100%; height: 100%; border: none; border-radius: 4px;"></iframe>
+                            </div>`;
+                            // Clean up blob URL when preview is closed
+                            const oldClose = elements.btnClosePreview.onclick;
+                            elements.btnClosePreview.onclick = () => {
+                                URL.revokeObjectURL(blobUrl);
+                                if (oldClose) oldClose();
+                                elements.previewOverlay.classList.remove('active');
+                                elements.previewOverlay.style.display = 'none';
+                                document.body.style.overflow = '';
+                            };
+                        } else {
+                            contentHtml = `<p style="color:red;">PDF 加载失败: HTTP ${pdfRes.status}</p>`;
+                        }
+                    } catch (pdfErr) {
+                        console.error("PDF blob fetch error:", pdfErr);
+                        contentHtml = `<p style="color:red;">PDF 加载失败: ${pdfErr.message}</p>`;
+                    }
                 } else if (suffix.endsWith('.md')) {
                     const rawHtml = marked.parse(data.content);
                     contentHtml = typeof DOMPurify !== "undefined" ? DOMPurify.sanitize(rawHtml) : rawHtml;
@@ -891,8 +920,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     hljs.highlightElement(block);
                 });
                 
+                elements.previewOverlay.style.display = 'flex'; // Explicitly set for robustness
                 elements.previewOverlay.classList.add('active');
                 document.body.style.overflow = 'hidden'; // 禁止背景滚动
+                
+                // Diagnostic check for visibility
+                setTimeout(() => {
+                    const rect = elements.previewOverlay.getBoundingClientRect();
+                    const style = window.getComputedStyle(elements.previewOverlay);
+                    console.log("Overlay visibility check:", {
+                        opacity: style.opacity,
+                        display: style.display,
+                        zIndex: style.zIndex,
+                        pointerEvents: style.pointerEvents,
+                        rect: rect
+                    });
+                }, 500);
             } else {
                 alert(`无法预览: ${data.error}`);
             }

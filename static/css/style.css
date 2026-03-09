@@ -717,20 +717,24 @@ body {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.4); /* Darker backdrop */
     backdrop-filter: blur(8px);
-    z-index: 100;
-    display: flex;
+    z-index: 1000;
+    display: none; /* Changed from flex */
     justify-content: center;
     align-items: center;
     opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s;
+    transition: opacity 0.15s;
 }
 
 .toast-overlay.active {
+    display: flex;
     opacity: 1;
     pointer-events: auto;
+}
+
+#preview-overlay {
+    z-index: 10001; /* Higher than sidebar resize handle and other overlays */
 }
 
 .glass-modal {
@@ -1489,4 +1493,39 @@ body {
     background: #ff4d4f;
     color: white;
     transform: rotate(90deg);
+}
+
+.preview-pdf-container, .preview-image-container {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.preview-image-container {
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}
+
+.preview-pdf-container iframe, .preview-image-container img {
+    background: white;
+    max-width: 100%;
+}
+
+@keyframes modalSlideUp {
+    0% { transform: translateY(15px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+.preview-overlay.active .preview-modal {
+    animation: modalSlideUp 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.preview-modal {
+    opacity: 1 !important; /* Force visibility when parent is active */
+    display: flex !important;
 }
