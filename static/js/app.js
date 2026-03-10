@@ -330,6 +330,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function switchSession(id) {
         if (currentSessionId === id) return;
+        if (isProcessing) {
+            console.warn(`[Session] Switch from ${currentSessionId} to ${id} blocked: isProcessing=true`);
+            showToast(
+                currentLang === 'zh' ? "请稍候" : "Please wait",
+                currentLang === 'zh' ? "AI 正在响应中，请稍后再切换" : "AI is currently responding, please wait before switching",
+                false,
+                '<i class="fa-solid fa-hourglass-half" style="font-size:3rem;color:var(--accent);margin-bottom:10px;"></i>'
+            );
+            setTimeout(() => {
+                if (!isProcessing) elements.toastOverlay.classList.remove('active');
+            }, 2000);
+            return;
+        }
+
+        console.log(`[Session] Switching to: ${id}`);
+        const previousId = currentSessionId;
         currentSessionId = id;
         localStorage.setItem('rag_session_id', id);
         
@@ -341,10 +357,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (elements.chatTitle) elements.chatTitle.textContent = result.session.title;
                 renderChatHistory();
                 loadSessions();
-                scrollToBottom(true); // Force scroll on switch
+                scrollToBottom(true);
+            } else {
+                throw new Error(result.error || "Failed to load session");
             }
         } catch (e) {
             console.error("Failed to switch session:", e);
+            currentSessionId = previousId;
+            localStorage.setItem('rag_session_id', previousId);
+            loadSessions();
         }
     }
 
@@ -613,14 +634,17 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSessions();
 
     if (elements.btnNewChat) {
-        elements.btnNewChat.onclick = createSession;
+        elements.btnNewChat.onclick = () => {
+            if (isProcessing) return;
+            createSession();
+        };
     }
     if (elements.btnSaveInsights) {
         elements.btnSaveInsights.onclick = saveInsights;
     }
 
     let isProcessing = false;
-    const AUTO_SCROLL_THRESHOLD = 180;
+    const AUTO_SCROLL_THRESHOLD = 40;
     let autoScrollLockedByUser = false;
     let isProgrammaticScroll = false;
 
@@ -635,10 +659,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // 用户在流式输出时上滑查看历史，暂停自动跟随，避免和滚轮冲突。
         elements.chatHistory.addEventListener('wheel', (e) => {
             if (!isProcessing) return;
+            // If user scrolls up, lock auto-scroll
             if (e.deltaY < 0) {
                 autoScrollLockedByUser = true;
-            } else if (isNearBottom()) {
-                autoScrollLockedByUser = false;
+            } else {
+                // If user scrolls down to bottom, unlock
+                if (isNearBottom()) {
+                    autoScrollLockedByUser = false;
+                }
             }
         }, { passive: true });
 
@@ -956,6 +984,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.btnClosePreview) {
         elements.btnClosePreview.onclick = () => {
             elements.previewOverlay.classList.remove('active');
+            elements.previewOverlay.style.display = 'none';
             document.body.style.overflow = '';
         };
     }
@@ -965,6 +994,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.previewOverlay.onclick = (e) => {
             if (e.target === elements.previewOverlay) {
                 elements.previewOverlay.classList.remove('active');
+                elements.previewOverlay.style.display = 'none';
                 document.body.style.overflow = '';
             }
         };
@@ -1335,22 +1365,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // Send Message Logic
     async function sendMessage() {
         const text = elements.chatInput.value.trim();
-        if (!text || isProcessing) return;
-
-        // 如果当前没有会话，先创建一个 (Create session if none exists)
-        if (!currentSessionId) {
-            await createSession();
-            if (!currentSessionId) {
-                console.error("Failed to create session automatically");
-                return;
-            }
+        if (!text) return;
+        if (isProcessing) {
+            console.warn("[Chat] sendMessage blocked: isProcessing=true");
+            return;
         }
 
+        console.log("[Chat] sendMessage starting...");
         isProcessing = true;
-        autoScrollLockedByUser = false;
+        
+        // Safety timeout: reset isProcessing after 60s if not already reset
+        window.activeChatTimeout = setTimeout(() => {
+            if (isProcessing) {
+                console.warn("[Chat] Safety reset: isProcessing was true for 60s, forcing false");
+                isProcessing = false;
+                elements.btnSend.disabled = false;
+            }
+        }, 60000);
+
+        autoScrollLockedByUser = false; // Reset lock on new message
         elements.chatInput.value = '';
         elements.chatInput.style.height = 'auto';
         elements.btnSend.disabled = true;
+
+        if (!currentSessionId) {
+            await createSession();
+        }
+        
+        if (!currentSessionId) {
+            isProcessing = false;
+            if (window.activeChatTimeout) clearTimeout(window.activeChatTimeout);
+            return;
+        }
+
+        const targetSessionId = currentSessionId;
 
         // Hide welcome
         if (elements.welcomeState) {
@@ -1564,14 +1612,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
                 chatHistory.push(messagePair);
                 
-                if (currentSessionId) {
-                    fetch(`/api/sessions/${currentSessionId}/message`, {
+                if (targetSessionId) {
+                    fetch(`/api/sessions/${targetSessionId}/message`, {
                         method: 'POST',
                         headers: getHeaders(true),
                         body: JSON.stringify({ message_pair: messagePair })
                     }).then(() => {
-                        // 如果是第一条消息，刷新列表以更新标题
-                        if (chatHistory.length === 1) loadSessions();
+                        // 如果是第一条消息且仍在该会话中，刷新列表以更新标题
+                        if (chatHistory.length === 1 && currentSessionId === targetSessionId) loadSessions();
                     });
                 }
             }
@@ -1584,7 +1632,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentContainer.innerHTML = `<p style="color:var(--error);">⚠️ 发生错误：无法连接到后端大模型服务。</p>`;
             }
         } finally {
+            console.log("[Chat] sendMessage finished.");
             isProcessing = false;
+            if (window.activeChatTimeout) {
+                clearTimeout(window.activeChatTimeout);
+                window.activeChatTimeout = null;
+            }
             autoScrollLockedByUser = false;
             if (elements.chatInput.value.trim().length > 0) {
                 elements.btnSend.disabled = false;
@@ -1727,14 +1780,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!force && autoScrollLockedByUser) return;
 
         if (force || isNearBottom()) {
-            // 使用 setTimeout 确保在布局更新后执行
-            setTimeout(() => {
-                isProgrammaticScroll = true;
-                container.scrollTop = container.scrollHeight;
-                requestAnimationFrame(() => {
-                    isProgrammaticScroll = false;
-                });
-            }, 50);
+            isProgrammaticScroll = true;
+            container.scrollTop = container.scrollHeight;
+            // Use requestAnimationFrame for a cleaner reset
+            requestAnimationFrame(() => {
+                isProgrammaticScroll = false;
+            });
         }
     }
 });

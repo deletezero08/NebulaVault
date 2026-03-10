@@ -426,6 +426,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    overflow-anchor: auto; /* Enable native browser scroll pinning */
+    scroll-behavior: smooth;
 }
 
 .message {
@@ -436,8 +438,8 @@ body {
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .user-message {

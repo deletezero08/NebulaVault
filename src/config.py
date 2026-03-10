@@ -68,9 +68,9 @@ def list_doc_files() -> List[str]:
 def list_skill_files() -> List[str]:
     ensure_dirs()
     skills: List[str] = []
-    # 扫描 skills 目录，主要寻找 SKILL.md
-    for entry in SKILLS_DIR.rglob('SKILL.md'):
-        if entry.is_file():
+    # 扫描 skills 目录，支持所有扩展名 (Scan skills dir, support all extensions)
+    for entry in SKILLS_DIR.rglob('*'):
+        if entry.is_file() and entry.suffix.lower() in SUPPORTED_EXTENSIONS:
             skills.append(str(entry.relative_to(SKILLS_DIR)))
     return sorted(skills)
 

@@ -385,6 +385,22 @@ def _do_rebuild_index(embeddings: Any, progress_callback: Optional[Any] = None) 
         default_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200, separators=["\n\n", "\n", "。", " ", ""])
         texts.extend(default_splitter.split_documents(docs_strategy_other))
 
+    # --- 技能文件特殊处理：保持原子性 (Skills: Keep Atomic) ---
+    # 我们遍历所有解析出的原始技能文档，如果不长，就直接作为整块存入
+    skills_to_add = []
+    for doc in documents:
+        if doc.metadata.get("is_skill"):
+            # 如果技能文件内容小于 4000 字符，直接作为一个 chunk，不切分
+            if len(doc.page_content) < 4000:
+                skills_to_add.append(doc)
+            else:
+                # 如果太长，还是走默认切分逻辑
+                skill_splitter = RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=400)
+                skills_to_add.extend(skill_splitter.split_documents([doc]))
+    
+    # 将技能加入总列表
+    texts.extend(skills_to_add)
+
     # 5.5 过滤非法输出：确保所有 chunk 的 content 都是有效字符串 (防止 pydantic 验证失败)
     valid_texts = []
     for t in texts:

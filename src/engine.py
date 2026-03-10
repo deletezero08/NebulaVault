@@ -63,6 +63,7 @@ class LocalRAG:
 8. 输出请使用清晰的 Markdown 格式（使用标题、列表或表格让信息易读）。
 
 {skills}
+{global_memory}
 【历史对话记录】（如果没有则忽略）:
 {history}
 
@@ -74,7 +75,7 @@ class LocalRAG:
 你的回答:"""
         self.prompt_zh = PromptTemplate(
             template=prompt_template,
-            input_variables=["history", "context", "question", "current_time", "skills"],
+            input_variables=["history", "context", "question", "current_time", "skills", "global_memory"],
         )
         
         prompt_template_en = """You are a professional RAG (Retrieval-Augmented Generation) assistant. document analysis. Please read the following reference materials and conversation history carefully, then answer the user's question.
@@ -91,6 +92,7 @@ Rules:
 7. Use clear Markdown (headers, lists, or tables).
 
 {skills}
+{global_memory}
 【Conversation History】 (Ignore if empty):
 {history}
 
@@ -102,7 +104,7 @@ User Question: {question}
 Your Answer (Please reply in English):"""
         self.prompt_en = PromptTemplate(
             template=prompt_template_en,
-            input_variables=["history", "context", "question", "current_time", "skills"],
+            input_variables=["history", "context", "question", "current_time", "skills", "global_memory"],
         )
         
         # Default prompt
@@ -608,13 +610,44 @@ List:
             mtime = doc.metadata.get("file_mtime_str", "未知")
             context_parts.append(f"[文档 {i}] 文件名: {filename}, 修改时间: {mtime}\n内容: {doc.page_content}")
         context = "\n\n".join(context_parts)
-        skills_text = ""
-        if skills:
-            skills_text = "【检测到匹配的专业技能指令，请务必优先遵循】:\n"
+        # --- 注入全局技能 (Global Skills Injection) ---
+        # 扫描 skills/ 根目录下的所有文件作为全局指令
+        global_skills = []
+        from .config import SKILLS_DIR
+        for f in SKILLS_DIR.glob('*'):
+            if f.is_file() and f.name != '.gitkeep' and not f.name.startswith('.'):
+                try:
+                    content = f.read_text("utf-8").strip()
+                    if content:
+                        global_skills.append(f"【全局固定指令 - {f.name}】: {content}")
+                except Exception: continue
+        
+        combined_skills_text = ""
+        if global_skills or skills:
+            combined_skills_text = "【检测到匹配的专业技能指令，请务必作为行为准则优先遵循】:\n"
+            # 先放全局指令
+            for i, s in enumerate(global_skills, 1):
+                combined_skills_text += f"A{i}. {s}\n"
+            # 再放检索到的技能
             for i, s in enumerate(skills, 1):
                 fname = os.path.basename(s.metadata.get("source", "未知技能"))
-                skills_text += f"{i}. 技能[{fname}]: {s.page_content}\n"
-        prompt_text = self.current_prompt.format(history=history_text, context=context, question=question, current_time=current_time, skills=skills_text)
+                combined_skills_text += f"B{i}. 局部技能[{fname}]: {s.page_content}\n"
+
+        # --- 获取全局记忆 (Global Memory Injection) ---
+        from .config import load_memory
+        global_mem_data = load_memory("global_memory")
+        global_mem_text = ""
+        if global_mem_data:
+            global_mem_text = f"【全局知识库见解 (Global Insights)】: {global_mem_data.get('insight', '')}\n"
+
+        prompt_text = self.current_prompt.format(
+            history=history_text, 
+            context=context, 
+            question=question, 
+            current_time=current_time, 
+            skills=combined_skills_text,
+            global_memory=global_mem_text
+        )
         answer = self.llm.invoke(prompt_text)
 
         return {
@@ -720,15 +753,34 @@ List:
             
         logger.info("stream_query_retrieved_docs=%s skills=%s", len(source_docs), len(skills))
         
-        # 2. 格式化 Skill
-        skills_text = ""
-        if skills:
-            skills_text = "【检测到匹配的专业技能指令，请务必优先遵循】:\n"
+        # 2. 注入全局技能与格式化检索到的 Skill
+        global_skills = []
+        from .config import SKILLS_DIR
+        for f in SKILLS_DIR.glob('*'):
+            if f.is_file() and f.name != '.gitkeep' and not f.name.startswith('.'):
+                try:
+                    content = f.read_text("utf-8").strip()
+                    if content:
+                        global_skills.append(f"【全局固定指令 - {f.name}】: {content}")
+                except Exception: continue
+
+        combined_skills_text = ""
+        if global_skills or skills:
+            combined_skills_text = "【检测到匹配的专业技能指令，请务必作为行为准则优先遵循】:\n"
+            for i, s in enumerate(global_skills, 1):
+                combined_skills_text += f"A{i}. {s}\n"
             for i, s in enumerate(skills, 1):
                 fname = os.path.basename(s.metadata.get("source", "未知技能"))
-                skills_text += f"{i}. 技能[{fname}]: {s.page_content}\n"
+                combined_skills_text += f"B{i}. 局部技能[{fname}]: {s.page_content}\n"
         
-        # 3. 格式化常规资料
+        # 3. 注入全局见解 (Inject Global Insights)
+        from .config import load_memory
+        global_mem_data = load_memory("global_memory")
+        global_mem_text = ""
+        if global_mem_data:
+            global_mem_text = f"【全局知识库见解 (Global Insights)】: {global_mem_data.get('insight', '')}\n"
+
+        # 4. 格式化常规资料
         current_time = time.strftime("%Y-%m-%d %H:%M:%S")
         context_parts = []
         for i, doc in enumerate(source_docs, 1):
@@ -737,13 +789,14 @@ List:
             context_parts.append(f"[文档 {i}] 文件名: {filename}, 修改时间: {mtime}\n内容: {doc.page_content}")
         context = "\n\n".join(context_parts)
         
-        # 4. 填充 Prompt
+        # 5. 填充 Prompt
         prompt_text = self.current_prompt.format(
             history=history_text, 
             context=context, 
             question=question, 
             current_time=current_time,
-            skills=skills_text
+            skills=combined_skills_text,
+            global_memory=global_mem_text
         )
 
         has_token = False
