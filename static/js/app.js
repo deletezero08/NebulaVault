@@ -329,22 +329,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function switchSession(id) {
-        if (currentSessionId === id) return;
+        console.log(`[Session] Attempting switch to: ${id} (Current: ${currentSessionId}, Processing: ${isProcessing})`);
+        
         if (isProcessing) {
-            console.warn(`[Session] Switch from ${currentSessionId} to ${id} blocked: isProcessing=true`);
+            console.warn(`[Session] Switch from ${currentSessionId} to ${id} blocked: isProcessing=true. Queueing.`);
+            pendingSessionId = id;
             showToast(
-                currentLang === 'zh' ? "请稍候" : "Please wait",
-                currentLang === 'zh' ? "AI 正在响应中，请稍后再切换" : "AI is currently responding, please wait before switching",
+                currentLang === 'zh' ? "已为您排队" : "Queued",
+                currentLang === 'zh' ? `AI 正在回答，完成后将自动为您切换到会话` : `AI is responding, will switch automatically after`,
                 false,
-                '<i class="fa-solid fa-hourglass-half" style="font-size:3rem;color:var(--accent);margin-bottom:10px;"></i>'
+                '<i class="fa-solid fa-clock-rotate-left" style="font-size:3rem;color:var(--accent);margin-bottom:10px;"></i>'
             );
-            setTimeout(() => {
-                if (!isProcessing) elements.toastOverlay.classList.remove('active');
-            }, 2000);
             return;
         }
 
-        console.log(`[Session] Switching to: ${id}`);
+        // Always reload if it's a different session or if chat is empty (robustness)
+        if (currentSessionId === id && chatHistory.length > 0) {
+            console.log(`[Session] Already on session ${id} and history exists, skipping reload`);
+            return;
+        }
+
         const previousId = currentSessionId;
         currentSessionId = id;
         localStorage.setItem('rag_session_id', id);
@@ -644,6 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let isProcessing = false;
+    let pendingSessionId = null; 
     const AUTO_SCROLL_THRESHOLD = 40;
     let autoScrollLockedByUser = false;
     let isProgrammaticScroll = false;
@@ -1639,8 +1644,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.activeChatTimeout = null;
             }
             autoScrollLockedByUser = false;
-            if (elements.chatInput.value.trim().length > 0) {
+            if (elements.chatInput.value && elements.chatInput.value.trim().length > 0) {
                 elements.btnSend.disabled = false;
+            }
+
+            // Consume pending switch
+            if (pendingSessionId) {
+                const nextId = pendingSessionId;
+                pendingSessionId = null;
+                console.log(`[Session] Executing pending switch to: ${nextId}`);
+                switchSession(nextId);
             }
         }
     }

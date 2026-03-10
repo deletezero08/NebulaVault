@@ -799,6 +799,14 @@ List:
             global_memory=global_mem_text
         )
 
+        logger.info("stream_query_prompt_len=%s skills_len=%s", len(prompt_text), len(combined_skills_text))
+        if len(combined_skills_text) > 0:
+             logger.debug("Active skills: %s", combined_skills_text[:200])
+        
+        # print("--- DEBUG PROMPT START ---")
+        # print(prompt_text)
+        # print("--- DEBUG PROMPT END ---")
+
         has_token = False
         for chunk in self.llm.stream(prompt_text):
             text = chunk if isinstance(chunk, str) else getattr(chunk, "content", str(chunk))
