@@ -10,12 +10,14 @@
 ## 特性
 
 - 纯本地运行，数据不出本机
-- 混合检索（Vector + BM25）
+- 混合检索（Vector + BM25 + 重排序）
 - 多格式文档（PDF、DOCX、TXT、MD、CSV、HTML、图片 OCR）
+- **技能引擎（Skills System）**：支持全局技能与按需检索技能（递归目录扫描）
+- **双重记忆（Memory System）**：支持基于会话的提炼记忆与全局固定记忆
+- **智能会话排队**：AI 响应期间自动排队切换请求，完成后无缝跳转
 - Web UI + CLI + Gradio
 - 增量索引（基于文件修改时间）
 - 流式响应（SSE）
-- 会话历史与“记忆”提炼
 
 ## 环境要求
 
@@ -34,11 +36,7 @@ pip install -r requirements.txt
 # 2) 准备模型
 ollama pull qwen3:8b
 
-# 3) （可选）设置环境变量
-cp .env.example .env
-# 然后按需修改 .env，或直接 export 变量
-
-# 4) 启动服务
+# 3) 启动服务（带热重载）
 python main.py
 ```
 
@@ -52,10 +50,26 @@ python main.py
 ├── src/
 ├── static/
 ├── docs/       # 待索引文档目录
+├── skills/     # 技能定义（.txt），根目录下为全局技能，子目录下为检索技能
 ├── sessions/   # 会话历史
-├── memory/     # 会话提炼记忆
+├── memory/     # 提炼记忆（global_memory.json 为全局记忆）
 └── chroma_db/  # 向量库（运行时生成）
 ```
+
+## 高级功能说明
+
+### 1. 技能引擎 (Skills System)
+- **全局技能**：放置在 `skills/` 根目录下的 `.txt` 文件（如 `global_rules.txt`），会对所有提问生效。
+- **检索技能**：放置在 `skills/` 子目录下的文件，仅当问题触发相关意图时才会被检索并注入 Prompt。
+- **原子性**：技能文件在索引时被视为独立原子，确保指令完整性。
+
+### 2. 记忆系统 (Memory System)
+- **会话记忆**：点击“存为记忆”可提炼当前会话精华并保存到 `memory/`。
+- **全局记忆**：在 `memory/global_memory.json` 中定义的数据将作为 LLM 的长期背景知识。
+
+### 3. 前端交互
+- **自动排队切换**：在 AI 流式输出时，您可以点击切换会话，系统将自动进入“排队状态”，并在当前回复结束后自动跳转。
+- **流畅滚动**：采用 `overflow-anchor` 技术，确保长文本输出时滚动极为平滑。
 
 ## 环境变量
 
