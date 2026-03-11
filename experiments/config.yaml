@@ -1,0 +1,29 @@
+# 检索与模型核心配置 (Thesis Experiment Config)
+
+retrieval:
+  # 混合检索模式: vector_only, ensemble, rrf
+  default_mode: "rrf"
+  
+  # RRF 算法参数
+  rrf_k: 60
+  
+  # 检索数量控制
+  vector_k: 12
+  bm25_k: 10
+  
+  # 权重分配 (仅用于 ensemble 模式)
+  weights:
+    vector: 0.7
+    bm25: 0.3
+
+llm:
+  # 评测用裁判模型
+  judge_model: "qwen3:8b"
+  # 默认生成模型
+  default_model: "qwen3:8b"
+
+evaluation:
+  # 每次评测的样本量
+  sample_size: 60
+  # 评测指标
+  metrics: ["faithfulness", "relevance"]

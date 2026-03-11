@@ -34,8 +34,16 @@ from .config import (
 )
 from .indexer import LOADER_MAP, load_persisted_db, rebuild_index, reset_index_storage
 from .retriever import build_qa_chain, build_retriever, extract_sources
+from .config import settings
 
 logger = logging.getLogger("rag_core")
+
+# Intent statistics for thesis reporting (意图识别统计)
+INTENT_STATS = {
+    "hits": 0,    # 成功识别目标文件/目录/类别
+    "bypass": 0,  # 关键词不匹配直接跳过 LLM
+    "misses": 0   # LLM 未能识别出明确意图
+}
 
 
 class LocalRAG:
@@ -109,6 +117,9 @@ Your Answer (Please reply in English):"""
         
         # Default prompt
         self.current_prompt: PromptTemplate = self.prompt_zh if "zh" in EMBED_MODEL.lower() else self.prompt_en
+        
+        # Retrieval Mode (Exp-A: ensemble, Exp-B: rrf, Baseline: vector_only)
+        self.retrieval_mode = os.getenv("RAG_RETRIEVAL_MODE", settings["retrieval"].get("default_mode", "rrf"))
 
         if has_persisted_index():
             self.load_indexed_db()
@@ -201,8 +212,8 @@ Your Answer (Please reply in English):"""
             self.retriever = None
             return
 
-        print("🔍 构建检索器 (Hybrid Search)...")
-        self.retriever = build_retriever(self.db)
+        print(f"🔍 构建检索器 (Mode: {self.retrieval_mode})...")
+        self.retriever = build_retriever(self.db, mode=self.retrieval_mode)
         # 动态选择 Prompt
         self.current_prompt = self.prompt_zh if "zh" in EMBED_MODEL.lower() else self.prompt_en
         self.qa = build_qa_chain(self.llm, self.retriever, self.current_prompt)
@@ -223,12 +234,12 @@ Your Answer (Please reply in English):"""
         """检测是否为不需要检索知识库的简单/寒暄类问题。"""
         # 常见寒暄语、自我介绍问题、单纯的礼貌用语
         simple_patterns = [
-            r"^(你好|哈喽|hi|hello|hey|早上好|中午好|中[午晚]好|下[午晚]好)$",
-            r"^(你是谁|你叫什么|你的名字|你是什么)$",
-            r"^(谢谢|感谢|太棒了|厉害了|真棒)$",
-            r"^(再见|拜拜|bye)$"
+            r"^(你好|哈喽|hi|hello|hey|早上好|中午好|下[午晚]好|请问你是|你是谁)",
+            r"(你好|哈喽|hi|hello|hey).*(请问|是谁|名字)",
+            r"^(谢谢|感谢|太棒了|厉害了|真棒)",
+            r"^(再见|拜拜|bye)"
         ]
-        q = question.strip().lower()
+        q = question.strip().lower().replace("，", "").replace("。", "").replace("？", "").replace("!", "").replace("！", "")
         return any(re.search(p, q) for p in simple_patterns) or len(q) <= 2
 
     def _handle_simple_query(self, question: str) -> Iterator[str]:
@@ -247,47 +258,63 @@ Your Answer (Please reply in English):"""
         if self.llm is None:
             return None
             
-        # 预剪枝：如果问题太短，没必要动用 LLM
-        if len(question.strip()) < 5:
+        # 预剪枝与闲聊旁路 (Pre-pruning & Chat Bypass)
+        q_clean = question.strip().lower()
+        if len(q_clean) < 5:
+            return None
+            
+        chat_keywords = ["你好", "你是谁", "自我介绍", "谢谢", "再见", "hello", "hi"]
+        if any(cw in q_clean for cw in chat_keywords) and len(q_clean) < 15:
+            logger.debug("chat_bypass_logic question=%s", q_clean)
+            INTENT_STATS["bypass"] += 1
             return None
             
         # 意图引擎旁路 (Intent Engine Bypass)
-        # 如果问题中没有暗示要找文件的关键词，直接跳过 LLM 意图分析，节省 10-60 秒！
-        file_keywords = ["文件", "目录", "夹", "第", "最新", "最后", "pdf", "word", "由于", "属于", "关于此", "这篇", "那个"]
+        # 优化：剔除弱指示词，仅保留强指示词，减少 RAG 噪声
+        file_keywords = ["文件", "目录", "文件夹", "第", "最新", "最后", "pdf", "word", "excel", "表格", "这张", "那张", "这个文件夹"]
         if not any(k in question.lower() for k in file_keywords):
-            logger.info("llm_intent_bypass question=%s", question[:80])
+            logger.debug("llm_intent_bypass question=%s", question[:80])
+            INTENT_STATS["bypass"] += 1
             return None
 
-        # 仅向模型展示前 100 个文件，避免上下文爆炸
-        display_files = all_files[:100]
+        # 稳定性优化：列表全局排序，确保“第一个/最后一个”语义可复现
+        display_files = sorted(all_files)[:100]
         file_list_str = "\n".join(f"- {f}" for f in display_files)
 
-        # 极简提示词，强迫模型快速响应
         intent_prompt = f"""[File Intent Engine] 
 List:
 {file_list_str}
 
 重要规则:
-1. 如果用户说"第一个文件"或"第1个"，请从文件列表中选出该目录下排序第1的文件。
-2. 如果用户说"最新的"或"最后一个"，选出该目录下排序最后的文件。
-3. 如果用户说"pdf文件"或"文字文件"等，设定 category 过滤而非 target_file。
-4. 如果用户说"rag文件夹下的第一个pdf"，先定位到 rag/ 目录，再选出第一个 .pdf 文件。
-5. 只输出 JSON，不要多余解释。"""
+1. 如果用户要求"第一个"或"第1个"，必须根据列表顺序选出。
+2. 必须且仅输出以下 JSON 结构：
+{{
+  "target_file": "文件名或 null",
+  "target_dir": "目录名或 null",
+  "category": "类别(pdf/word_text/image/data_web/markdown)或 null"
+}}
+3. 禁止输出任何解释。"""
 
         try:
-            logger.info("llm_intent_extraction_start question=%s", question[:80])
+            logger.debug("llm_intent_extraction_start question=%s", question[:80])
             raw = self.llm.invoke(intent_prompt)
-            # 提取 JSON 部分 (兼容模型在 JSON 前后可能输出的 ```json 等标记)
+            # 提取 JSON 部分
             raw = raw.strip()
-            if "```" in raw:
-                # 去掉 markdown 代码块
-                raw = raw.split("```")[1] if "```" in raw else raw
-                if raw.startswith("json"):
-                    raw = raw[4:]
-                raw = raw.strip()
-
+            match = re.search(r'\{.*\}', raw, re.DOTALL)
+            if match:
+                raw = match.group()
+            
             result = json.loads(raw)
-            logger.info("llm_intent_result=%s", result)
+            # 优化 C: 意图结果完整性校验 (Schema Integrity)
+            # 如果核心字段全部为 null，视为无意图
+            if not result.get("target_file") and not result.get("target_dir") and not result.get("category"):
+                logger.debug("llm_empty_intent_detected")
+                return None
+
+            for key in ["target_file", "target_dir", "category"]:
+                if key not in result: result[key] = None
+            
+            logger.debug("llm_intent_result=%s", result)
             return result
         except asyncio.TimeoutError:
             logger.warning("llm_intent_extraction_timeout")
@@ -351,10 +378,12 @@ List:
             for rel_path in all_files:
                 parts = Path(rel_path).parent.parts
                 for part in parts:
-                    if part and part != "." and len(part) >= 2:
-                        pattern = r'(?<![a-zA-Z])' + re.escape(part.lower()) + r'(?![a-zA-Z])'
+                    # 改进：增加边界约束与最小长度阈值 (min_len=3)，防止短目录名误命中
+                    if part and part != "." and len(part) >= 3:
+                        pattern = r'(?<![a-zA-Z0-9])' + re.escape(part.lower()) + r'(?![a-zA-Z0-9])'
                         if re.search(pattern, question.lower()):
                             target_dirs.add(part)
+                            logger.debug("directory_match_found dir=%s", part)
 
         if not detected_category:
             extension_to_category = {
@@ -366,8 +395,12 @@ List:
                 ".yml": "markdown",
                 ".yaml": "markdown",
                 ".csv": "data_web",
+                ".xlsx": "data_web",
+                ".xls": "data_web",
+                ".json": "data_web",
                 ".html": "data_web",
                 ".htm": "data_web",
+                ".pptx": "word_text",
                 ".png": "image",
                 ".jpg": "image",
                 ".jpeg": "image",
@@ -435,12 +468,26 @@ List:
             else:
                 filter_dict = {"$and": filters}
 
-            logger.info("retrieval_filter_active filter=%s", filter_dict)
-            target_k = 5 if target_filename else 6
-            search_kwargs = {"k": target_k, "fetch_k": target_k * 2, "filter": filter_dict}
+            logger.debug("retrieval_filter_active filter=%s", filter_dict)
+            
+            # 优化 A: 无明确意图时不落到具体文件
+            # 如果识别到了目标文件名，但文件并不存在于知识库中，则回退为常规检索
+            if target_filename and target_filename not in all_files:
+                logger.warning("intent_target_not_found filename=%s, falling back", target_filename)
+                target_filename = None
+                filter_dict = None # 或者根据 category 重新构建
+            
+            # 改进：如果锁定了特定文件，严格限制 k 值并禁用跨文件召回
+            if target_filename:
+                target_k = settings["retrieval"].get("vector_k", 12)
+                search_params = {"k": target_k, "filter": filter_dict}
+            else:
+                target_k = 6
+                search_params = {"k": target_k, "fetch_k": target_k * 3, "filter": filter_dict}
+
             vector_retriever = self.db.as_retriever(
-                search_type="mmr",
-                search_kwargs=search_kwargs,
+                search_type="mmr" if not target_filename else "similarity",
+                search_kwargs=search_params,
             )
             docs = vector_retriever.invoke(question)
 
@@ -479,6 +526,14 @@ List:
             enriched_docs.append(doc)
 
         # 返回 (常规文档, 技能, 最终分类, 最终目标文件)
+        # 统计记录 (优化：仅在真正命中预期的文件/目录/类别过滤时计为 hit)
+        if target_filename or target_dirs or (final_category and final_category != "all"):
+            INTENT_STATS["hits"] += 1
+        else:
+            # 如果没有找到任何意图特征，且之前没有命中 bypass，则计为 miss
+            # 注意：bypass 已经在 _extract_intent_with_llm 中提前增加
+            INTENT_STATS["misses"] += 1
+            
         return enriched_docs, skills, final_category, target_filename
 
     def distill_insights(self, history: List[Dict[str, Any]]) -> Optional[str]:
@@ -719,6 +774,7 @@ List:
         yield {"type": "status", "data": "🔍 正在分析您的意图..."}
         
         # 1. 检索 (现在返回 常规文档, 技能, 分类, 目标文件)
+        yield {"type": "status", "data": "📂 正在检索知识库..."}
         source_docs, skills, final_category, target_filename = self._retrieve_documents(search_query, category)
         
         # 通知前端：意图分析完成
@@ -730,10 +786,12 @@ List:
         
         yield {"type": "status", "data": status_msg}
 
-        if source_docs:
+        if target_filename and source_docs:
             first_source_path = source_docs[0].metadata.get("source", "")
             first_source = os.path.basename(first_source_path)
-            yield {"type": "status", "data": f"📑 正在分析文档内容: {first_source}..."}
+            yield {"type": "status", "data": f"📑 正在分析指定文档: {first_source}..."}
+        elif source_docs:
+            yield {"type": "status", "data": "📑 正在提取全库最相关的参考片段..."}
             
             # Record file usage for the primary retrieved document
             from .config import record_file_usage, DOCS_DIR

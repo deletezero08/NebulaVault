@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NebulaVault Experiment Log Schema",
+  "type": "object",
+  "required": ["experiment_id", "timestamp", "config", "results"],
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "description": "Unique identifier for the experiment run (e.g., EXP-20260311-001)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["vector_only", "ensemble", "rrf"],
+      "description": "The retrieval mode used"
+    },
+    "config": {
+      "type": "object",
+      "description": "Snapshot of the config.yaml used for this run"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["question_id", "scores"],
+        "properties": {
+          "question_id": { "type": "string" },
+          "question": { "type": "string" },
+          "answer": { "type": "string" },
+          "scores": {
+            "type": "object",
+            "properties": {
+              "faithfulness": { "type": "number" },
+              "relevance": { "type": "number" }
+            }
+          },
+          "latency": { "type": "number" }
+        }
+      }
+    },
+    "metrics_summary": {
+      "type": "object",
+      "properties": {
+        "avg_faithfulness": { "type": "number" },
+        "avg_relevance": { "type": "number" },
+        "avg_latency": { "type": "number" }
+      }
+    }
+  }
+}

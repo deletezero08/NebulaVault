@@ -1,0 +1,26 @@
+[
+  {
+    "id": "Q001",
+    "type": "factual",
+    "question": "星澜知库 NebulaVault 的 API 服务默认运行在哪个端口？",
+    "ground_truth": "NebulaVault 的 API 服务默认运行在 8000 端口（http://127.0.0.1:8000）。"
+  },
+  {
+    "id": "Q002",
+    "type": "factual",
+    "question": "系统支持预览哪些类型的文件？",
+    "ground_truth": "系统支持预览 PDF（通过 iframe 渲染）和图片（PNG, JPG, JPEG, WEBP，通过 Base64 渲染）。"
+  },
+  {
+    "id": "Q003",
+    "type": "technical",
+    "question": "混合检索中 RRF (Reciprocal Rank Fusion) 算法的常数 k 默认值是多少？",
+    "ground_truth": "在 `src/retriever.py` 的实现中，RRF 算法的常数 k 默认设置为 60。"
+  },
+  {
+    "id": "Q004",
+    "type": "summary",
+    "question": "简述 NebulaVault 的增量索引机制是如何检测文件变化的。",
+    "ground_truth": "增量索引机制通过扫描 `docs/` 和 `skills/` 目录下的文件修改时间 (mtime)，并与 `chroma_db/index_manifest.json` 中记录的时间戳对比。如果文件新增或修改时间大于 1 秒，则触发重新解析和向量库更新。"
+  }
+]

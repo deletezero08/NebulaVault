@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 from urllib.parse import quote
+import yaml
 BASE_DIR = Path(__file__).resolve().parent.parent
 LEGACY_PDFS_DIR = BASE_DIR / "pdfs"
 
@@ -39,6 +40,39 @@ LLM_MODEL = _llm_model if _llm_model else "qwen3:8b"
 
 _ollama_host = os.getenv("OLLAMA_HOST", "").strip()
 OLLAMA_HOST = _ollama_host if _ollama_host else "http://127.0.0.1:11434"
+
+# --- 实验配置加载 (Experiment Config Loading) ---
+CONFIG_PATH = BASE_DIR / "experiments" / "config.yaml"
+
+def load_config() -> Dict[str, Any]:
+    """加载 experiments/config.yaml 文件"""
+    if not CONFIG_PATH.exists():
+        return {
+            "retrieval": {
+                "default_mode": "rrf",
+                "rrf_k": 60,
+                "vector_k": 12,
+                "bm25_k": 10,
+                "weights": {"vector": 0.7, "bm25": 0.3}
+            },
+            "llm": {
+                "judge_model": "qwen3:8b",
+                "default_model": "qwen3:8b"
+            }
+        }
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        print(f"Warning: Failed to load config.yaml: {e}")
+        return {}
+
+settings = load_config()
+
+# 如果 config.yaml 中定义了模型，则尝试覆盖默认值
+if settings.get("llm"):
+    if settings["llm"].get("default_model"):
+        LLM_MODEL = settings["llm"]["default_model"]
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".csv", ".html", ".htm", ".yml", ".yaml", ".png", ".jpg", ".jpeg", ".webp"}
 USAGE_FILE = BASE_DIR / "file_usage.json"

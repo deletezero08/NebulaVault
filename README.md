@@ -7,6 +7,9 @@
 
 基于 LangChain + ChromaDB + Ollama 的本地 RAG 系统，支持多格式文档索引、流式问答、多会话与会话记忆。
 
+> [!NOTE]
+> **毕业论文研究进展**: 本项目目前正作为毕业论文实验平台。关于 RRF 混合检索优化及自动化评估（EncouRAGe）的详细记录，请参阅 [THESIS_PROGRESS.md](./THESIS_PROGRESS.md)。
+
 ## 特性
 
 - 纯本地运行，数据不出本机

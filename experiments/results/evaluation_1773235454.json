@@ -1,0 +1,94 @@
+{
+  "vector_only": [
+    {
+      "id": "Q001",
+      "question": "星澜知库 NebulaVault 的 API 服务默认运行在哪个端口？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据提供的文档，我无法找到星澜知库 NebulaVault 的 API 服务默认运行端口相关信息。所有参考资料仅描述了 API 接口的路径、功能和认证方式（如 `/api/status`、`/api/health` 等），但未提及服务器监听的端口号或网络配置细节。\n\n建议您检查以下方向获取更准确的信息：\n1. 查阅项目配置文件（如 `.env` 或 `docker-compose.yml`）中是否定义了 `UVICORN_PORT` 等环境变量\n2. 查看系统部署文档中关于服务启动参数的说明\n3. 检查运行时容器/进程的监听端口（如通过 `netstat` 或 `docker ps` 命令）",
+      "latency": 56.861899852752686,
+      "scores": {
+        "faithfulness": 9,
+        "relevance": 7
+      },
+      "sources_count": 1
+    },
+    {
+      "id": "Q002",
+      "question": "系统支持预览哪些类型的文件？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据文档 1 的信息，系统支持预览以下类型的文件：\n\n| 文件格式       | 支持状态 | 说明                     |\n|----------------|----------|--------------------------|\n| `.csv`         | ✅ 支持  | 逗号分隔值文件           |\n| `.docx`        | ✅ 支持  | Word 文档格式            |\n| `.pdf`         | ✅ 支持  | PDF 电子书/报告          |\n| `.txt`         | ✅ 支持  | 纯文本文件               |\n| `其他格式`     | ⚠ 需确认 | 请通过 `/api/files/content` 接口验证（需 Bearer Token 认证） |\n\n> 注：完整支持列表包含更多格式（如 `.epub`、`.md` 等），具体以 `/api/status` 接口返回的 `supported_formats` 字段为准。",
+      "latency": 69.30539226531982,
+      "scores": {
+        "faithfulness": 7,
+        "relevance": 9
+      },
+      "sources_count": 1
+    },
+    {
+      "id": "Q003",
+      "question": "混合检索中 RRF (Reciprocal Rank Fusion) 算法的常数 k 默认值是多少？",
+      "answer": "在混合检索中，**RRF (Reciprocal Rank Fusion)** 算法的常数 **k** 的默认值通常为 **1**。  \nRRF 的公式为：  \n$$\n\\text{RRF}(d) = \\frac{1}{k + \\frac{1}{\\text{rank}(d)}}\n$$  \n其中，$ k $ 是一个调节参数，用于平衡不同检索系统之间的权重。默认值 **k=1** 是最常见的选择，因为它能有效融合多个检索结果，同时避免过度偏向某一系统。  \n\n### 补充说明：\n1. **k 的作用**：  \n   - 当 $ k $ 增大时，RRF 更倾向于保留排名靠前的文档（即更强调高排名的文档）。  \n   - 当 $ k $ 减小时，RRF 更关注多个系统中一致的文档（即更强调多样性）。  \n\n2. **实际应用中的调整**：  \n   - 在某些实现中（如 Elasticsearch 的 `rrf` 融合策略），默认值可能根据具体场景调整，但 **k=1** 仍是标准默认值。  \n   - 如果需要更精细的控制，可以通过实验调整 $ k $ 的值。  \n\n3. **相关文献**：  \n   - RRF 最早由 **Huang et al. (2009)** 提出，其默认参数通常为 $ k=1 $。  \n   - 后续研究（如混合检索的优化）可能基于此默认值进行扩展。  \n\n如果您的具体场景或工具（如开源库）有特殊实现，建议查阅对应文档以确认默认值。",
+      "latency": 118.80567598342896,
+      "scores": {
+        "faithfulness": 5,
+        "relevance": 9
+      },
+      "sources_count": 7
+    },
+    {
+      "id": "Q004",
+      "question": "简述 NebulaVault 的增量索引机制是如何检测文件变化的。",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据提供的文档，我无法找到与 \"NebulaVault 的增量索引机制\" 相关的信息。所有参考资料均聚焦于 GraphRAG 系统的图结构分解方法（如 k-core 分解、社区合并算法 M2hC/MRC）、多文档推理评估框架及实验结果，未提及任何名为 NebulaVault 的系统或其索引机制。",
+      "latency": 61.77887177467346,
+      "scores": {
+        "faithfulness": 0,
+        "relevance": 0
+      },
+      "sources_count": 5
+    }
+  ],
+  "rrf": [
+    {
+      "id": "Q001",
+      "question": "星澜知库 NebulaVault 的 API 服务默认运行在哪个端口？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据提供的文档，我无法找到星澜知库 NebulaVault 的 API 服务默认运行端口相关信息。所有参考资料（文档 1-8）均未提及具体端口号，仅描述了 API 路由路径、认证方式及功能说明。若需获取端口配置，建议查阅项目部署配置文件（如 `docker-compose.yml` 或 `.env`）或联系系统管理员确认。",
+      "latency": 51.04162406921387,
+      "scores": {
+        "faithfulness": 2,
+        "relevance": 2
+      },
+      "sources_count": 1
+    },
+    {
+      "id": "Q002",
+      "question": "系统支持预览哪些类型的文件？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据文档 1 的信息，系统支持预览以下类型的文件：\n\n| 文件格式       | 支持状态 | 说明                     |\n|----------------|----------|--------------------------|\n| `.csv`         | ✅ 支持  | 逗号分隔值文件           |\n| `.docx`        | ✅ 支持  | Word 文档格式            |\n| `.pdf`         | ✅ 支持  | PDF 电子书/报告          |\n| `.txt`         | ✅ 支持  | 纯文本文件               |\n| `其他格式`     | ⚠ 需验证 | 请通过 `/api/files/content` 接口确认（需 Bearer Token 认证） |\n\n> 注：完整支持列表包含更多格式（如 `.epub`、`.md` 等），具体以 `/api/status` 接口返回的 `supported_formats` 字段为准。",
+      "latency": 101.56427383422852,
+      "scores": {
+        "faithfulness": 8,
+        "relevance": 9
+      },
+      "sources_count": 1
+    },
+    {
+      "id": "Q003",
+      "question": "混合检索中 RRF (Reciprocal Rank Fusion) 算法的常数 k 默认值是多少？",
+      "answer": "在混合检索中，**RRF（Reciprocal Rank Fusion）算法的常数 $ k $ 的默认值通常为 1**。这一默认值在大多数文献和实现中（如 Apache Solr、信息检索工具包等）均采用，用于平衡不同检索系统结果的权重。\n\n### 关键说明：\n1. **公式背景**  \n   RRF 的核心公式为：  \n   $$\n   \\text{rank} = \\frac{1}{k + \\frac{1}{\\text{position}}}\n   $$  \n   其中 $ k $ 是一个正整数，用于调整不同检索系统结果的融合权重。当 $ k=1 $ 时，公式简化为：  \n   $$\n   \\text{rank} = \\frac{1}{1 + \\frac{1}{\\text{position}}}\n   $$  \n   这种设置对排名位置的差异更敏感，适合多数场景。\n\n2. **默认值的依据**  \n   - **信息检索领域**：RRF 的原始论文（如 [1]）通常将 $ k $ 设为 1，以简化计算并保持对排名位置的敏感性。  \n   - **实际工具实现**：例如 Apache Solr 的 RRF 实现默认 $ k=1 $，而其他工具（如 Python 的 `rankfusion` 库）也可能采用此默认值。  \n   - **灵活性**：虽然 $ k=1 $ 是默认值，但实际应用中可根据需求调整 $ k $ 的值（如 $ k=0 $ 或更大），以改变融合策略。\n\n3. **注意事项**  \n   - **具体实现差异**：某些框架或库可能对 $ k $ 的默认值有不同定义，需参考具体文档。  \n   - **参数调优**：在实际应用中，$ k $ 的值可能需要通过实验调整，以优化检索效果。\n\n### 参考文献：\n1. **RRF 原始论文**：  \n   - [1] J. Zhang, et al. \"Rank Fusion of Multiple Search Results.\" *Proceedings of the 2002 ACM Conference on Information and Knowledge Management*, 2002.  \n   - 该论文中 $ k $ 的默认值为 1。\n\n2. **Apache Solr 实现**：  \n   - Solr 的 RRF 实现（如 `rank` 查询）默认 $ k=1 $，具体可参考其官方文档。\n\n**结论**：在大多数情况下，RRF 的 $ k $ 默认值为 **1**，但实际应用中需根据具体实现和需求进行验证。",
+      "latency": 119.87835717201233,
+      "scores": {
+        "faithfulness": 7,
+        "relevance": 9
+      },
+      "sources_count": 7
+    },
+    {
+      "id": "Q004",
+      "question": "简述 NebulaVault 的增量索引机制是如何检测文件变化的。",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\nNebulaVault 的增量索引机制通过以下方式检测文件变化：  \n1. **API 端点监控**：使用 `POST /api/index` 或 `POST /api/index?token=<Your-Token>` 端点（根据第1页），结合 Server-Sent Events (SSE) 协议实时监听文档变更  \n2. **变更类型识别**：系统可检测文件的**新增**或**删除**操作（根据第1页）  \n3. **触发处理流程**：当检测到变化时，会通过 LLM 或本地解析器生成 Vector Embeddings，并将结果持久化（根据第1页）  \n\n该机制的核心特点是通过 SSE 实现低延迟的变更通知，并通过分段响应（`event: progress`/`event: success`）逐步更新索引状态（根据第1页和第2页）。",
+      "latency": 72.11331582069397,
+      "scores": {
+        "faithfulness": 7,
+        "relevance": 8
+      },
+      "sources_count": 1
+    }
+  ]
+}

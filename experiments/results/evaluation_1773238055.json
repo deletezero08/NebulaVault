@@ -1,0 +1,94 @@
+{
+  "vector_only": [
+    {
+      "id": "Q001",
+      "question": "星澜知库 NebulaVault 的 API 服务默认运行在哪个端口？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据提供的文档，我无法找到相关信息。\n\n所有参考资料（文档1-8）均未提及星澜知库 NebulaVault 的 API 服务默认运行端口。文档内容主要聚焦于：\n- API 路由路径（如 `/api/status`、`/api/health` 等）\n- 认证方式（Bearer Token、环境变量等）\n- 功能描述（知识库状态查询、会话摘要、SSE流式接口等）\n\n若需获取端口信息，建议检查以下方向：\n1. 项目配置文件（如 `docker-compose.yml` 或 `.env`）\n2. 服务启动日志\n3. 默认部署配置（如使用 Nginx 反向代理时的配置）",
+      "latency": 61.37735295295715,
+      "scores": {
+        "faithfulness": 10,
+        "relevance": 10
+      },
+      "sources_count": 1
+    },
+    {
+      "id": "Q002",
+      "question": "系统支持预览哪些类型的文件？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据文档 1 的信息，系统支持预览以下类型的文件：\n\n**支持的文件格式列表**  \n| 文件格式 | 说明 |\n|---------|------|\n| `.csv` | 逗号分隔值文件 |\n| `.docx` | Word 文档（基于 Markdown 渲染） |\n| `.pdf` | PDF 文档（支持文本层提取） |\n| `.txt` | 纯文本文件 |\n\n> 注：此列表来源于系统状态接口 `/api/status` 的 `supported_formats` 字段（文档 1，修改时间：2026-03-07 15:32:43）。对于 Markdown 文件的预览支持，需结合文档 4 的 `GET /api/files/content` 接口实现。",
+      "latency": 57.267295122146606,
+      "scores": {
+        "faithfulness": 9,
+        "relevance": 10
+      },
+      "sources_count": 1
+    },
+    {
+      "id": "Q003",
+      "question": "混合检索中 RRF (Reciprocal Rank Fusion) 算法的常数 k 默认值是多少？",
+      "answer": "在混合检索中，**RRF (Reciprocal Rank Fusion)** 算法的常数 **k 的默认值通常为 1**。  \n\n### 说明：\n1. **RRF 公式**：  \n   RRF 的核心公式为：  \n   $$\n   \\text{rank} = \\frac{1}{k + \\text{position}}\n   $$  \n   其中，`position` 是文档在某个检索系统中的排名位置（如 1 表示最相关），`k` 是一个可调参数，用于控制融合结果对排名位置的敏感度。\n\n2. **默认值设定**：  \n   - **k=1** 是最常见的默认值，因为它能平衡不同检索系统的排名差异，避免对位置差异过度敏感。  \n   - 若 `k` 增大（如 `k=2`），会更强调排名靠前的文档；若 `k` 减小（如 `k=0`），则更依赖位置差异。\n\n3. **实际应用中的调整**：  \n   - 在具体实现（如 Apache Solr、Elasticsearch 或自定义系统中），`k` 可能根据场景调整，但默认值通常为 **1**。  \n   - 若未显式设置，需参考具体框架或论文的默认配置。\n\n### 总结：\n**RRF 的常数 k 默认值为 1**，但实际应用中可根据需求调整。",
+      "latency": 109.05283713340759,
+      "scores": {
+        "faithfulness": 7,
+        "relevance": 9
+      },
+      "sources_count": 7
+    },
+    {
+      "id": "Q004",
+      "question": "简述 NebulaVault 的增量索引机制是如何检测文件变化的。",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\nNebulaVault 的增量索引机制通过以下方式检测文件变化：  \n1. **API 端点监控**：使用 `POST /api/index` 或 `POST /api/index?token=<Your-Token>` 端点（根据第1页），结合 Server-Sent Events (SSE) 协议实时监听文档变更  \n2. **变更类型识别**：系统可检测文件的**新增**或**删除**操作（根据第1页）  \n3. **响应机制**：通过 SSE 流式响应三种状态：  \n   - `event: progress`：推送变更处理进度（根据第1页）  \n   - `event: success`：确认新增片段数量（根据第1页）  \n   - `event: error`：返回错误信息（根据第1页）  \n4. **向量嵌入生成**：检测到变更后，系统会通过 LLM 或本地解析器生成 Vector Embeddings 并持久化（根据第1页）  \n\n该机制的核心是通过 SSE 实现实时监控，结合 API 端点完成增量更新（根据第1页和第2页）。",
+      "latency": 84.81441116333008,
+      "scores": {
+        "faithfulness": 6,
+        "relevance": 8
+      },
+      "sources_count": 1
+    }
+  ],
+  "rrf": [
+    {
+      "id": "Q001",
+      "question": "星澜知库 NebulaVault 的 API 服务默认运行在哪个端口？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据提供的文档，我无法找到关于星澜知库 NebulaVault 的 API 服务默认运行端口的相关信息。所有参考资料主要涉及 API 的认证方式、端点路径（如 `/api/status`、`/api/health` 等）、功能描述及技术实现细节，但未提及网络端口配置（如 80、443 或其他自定义端口）。\n\n如需进一步确认，建议检查以下方向：\n1. 查阅项目配置文件（如 `.env` 或 `docker-compose.yml`）中是否定义了 `PORT` 变量\n2. 查看服务启动日志或文档中关于部署的说明\n3. 联系技术团队或参考官方文档的网络配置章节",
+      "latency": 58.92538070678711,
+      "scores": {
+        "faithfulness": 9,
+        "relevance": 5
+      },
+      "sources_count": 2
+    },
+    {
+      "id": "Q002",
+      "question": "系统支持预览哪些类型的文件？",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\n根据文档 1 的信息，系统支持预览以下类型的文件：\n\n**支持的文件格式列表**  \n| 文件格式 | 说明 |\n|---------|------|\n| `.csv` | 逗号分隔值文件 |\n| `.docx` | Word 文档（基于 Markdown 渲染） |\n| `.pdf` | PDF 电子书/报告（支持文本层提取） |\n| `.txt` | 纯文本文件 |\n\n> 📌 说明：  \n> 1. 该列表来源于 `GET /api/status` 接口返回的 `supported_formats` 字段（文档 1，修改时间：2026-03-07 15:32:43）  \n> 2. 部分格式（如 `.pdf`）可能仅支持文本内容提取，具体渲染能力取决于后端解析模块  \n> 3. 若需获取文件源码内容（如 Markdown 或纯文本），可通过 `GET /api/files/content` 接口（文档 4）",
+      "latency": 105.8999879360199,
+      "scores": {
+        "faithfulness": 5,
+        "relevance": 6
+      },
+      "sources_count": 1
+    },
+    {
+      "id": "Q003",
+      "question": "混合检索中 RRF (Reciprocal Rank Fusion) 算法的常数 k 默认值是多少？",
+      "answer": "在混合检索中，RRF（Reciprocal Rank Fusion）算法的常数 $ k $ 的默认值通常为 **1**。这一设定在多数实现中被采用，用于平滑排名分数，避免除以零的情况（当 $ r = 0 $ 时）。具体数值可能因不同框架或论文的实现细节而略有差异，但默认情况下，$ k = 1 $ 是最常见的选择。",
+      "latency": 101.4356038570404,
+      "scores": {
+        "faithfulness": 3,
+        "relevance": 5
+      },
+      "sources_count": 7
+    },
+    {
+      "id": "Q004",
+      "question": "简述 NebulaVault 的增量索引机制是如何检测文件变化的。",
+      "answer": "【NebulaVault 技能系统：运行正常】\n\nNebulaVault 的增量索引机制通过以下方式检测文件变化：  \n1. **API 端点监控**：使用 `POST /api/index` 或 `POST /api/index?token=<Your-Token>` 端点（根据第1页），结合 Server-Sent Events (SSE) 协议实时监听文档变更  \n2. **变更类型识别**：系统可检测文件的**新增**或**删除**操作（根据第1页）  \n3. **响应流机制**：通过 SSE 的事件流分三种状态反馈：  \n   - `event: progress`：推送变更处理进度  \n   - `event: success`：返回新增片段数量（根据第1页）  \n   - `event: error`：错误信息通知  \n\n该机制的核心是通过 SSE 实时同步文件变化，并触发 LLM 或本地解析器生成向量嵌入（根据第1页）。此设计参考了文档中描述的\"打字机动画形式的逐步响应\"（根据第2页）特性。",
+      "latency": 112.87854313850403,
+      "scores": {
+        "faithfulness": 9,
+        "relevance": 9
+      },
+      "sources_count": 1
+    }
+  ]
+}
